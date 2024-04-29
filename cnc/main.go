@@ -60,7 +60,7 @@ func initialHandler(conn net.Conn) {
         return
     }
 
-    if l == 4 && buf[0] == 0x00 && buf[1] == 0x00 && buf[2] == 0x00 {
+    if l >= 4 && buf[0] == 0x00 && buf[1] == 0x00 && buf[2] == 0x00 {
         if buf[3] > 0 {
             string_len := make([]byte, 1)
             l, err := conn.Read(string_len)
